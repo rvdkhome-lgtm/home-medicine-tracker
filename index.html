@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#155e59">
+  <meta name="description" content="A private household medicine inventory with expiry reminders and Google Drive sync.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Home Medicine Tracker</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">✚</div>
+    <div class="brand-text"><h1>Home Medicine Tracker</h1><p>Medicine cabinet · Expiry watch</p></div>
+    <button id="settingsBtn" class="icon-btn" aria-label="Settings" title="Settings">⚙</button>
+  </header>
+  <main class="container">
+    <section class="drive-banner" id="driveBanner">
+      <div class="drive-status"><span id="driveDot" class="status-dot"></span><div><strong id="driveStatusTitle">Stored on this device</strong><p id="driveStatusText">Connect Google Drive to sync this inventory across your devices.</p></div></div>
+      <button id="connectDriveBtn" class="btn btn-light">Connect Drive</button>
+    </section>
+
+    <section class="stats-grid" aria-label="Inventory summary">
+      <article class="stat-card"><span class="stat-label">Medicines</span><strong id="statTotal">0</strong></article>
+      <article class="stat-card stat-warn"><span class="stat-label">Expiring in 30 days</span><strong id="statSoon">0</strong></article>
+      <article class="stat-card stat-danger"><span class="stat-label">Expired</span><strong id="statExpired">0</strong></article>
+    </section>
+
+    <section class="toolbar">
+      <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Search medicine or ingredient" aria-label="Search medicines"></div>
+      <button id="addMedicineBtn" class="btn btn-primary"><span aria-hidden="true">＋</span> Add medicine</button>
+    </section>
+    <section class="filter-row" aria-label="Filter inventory">
+      <button class="filter-chip active" data-filter="all">All medicines</button>
+      <button class="filter-chip" data-filter="soon">Expiring soon</button>
+      <button class="filter-chip" data-filter="expired">Expired</button>
+    </section>
+    <section id="medicineList" class="medicine-list" aria-live="polite"></section>
+    <section id="emptyState" class="empty-state hidden"><div class="empty-icon">＋</div><h2>No medicines yet</h2><p>Add the medicines in your household, then set an expiry date and reminders for each one.</p><button id="emptyAddBtn" class="btn btn-primary">Add your first medicine</button></section>
+
+    <section class="bottom-tools">
+      <button id="remindersBtn" class="btn btn-outline">🔔 Reminder settings</button>
+      <button id="exportBtn" class="btn btn-outline">Export backup</button>
+      <label class="btn btn-outline import-label">Import backup<input id="importInput" type="file" accept="application/json,.json" hidden></label>
+    </section>
+    <p class="footnote">Reminder notifications are checked while the app is open and when it is opened again. Browser apps cannot guarantee exact-time reminders when Android has stopped the app.</p>
+  </main>
+
+  <dialog id="medicineDialog" class="modal">
+    <form id="medicineForm" method="dialog" autocomplete="off">
+      <div class="modal-head"><div><p class="eyebrow" id="formEyebrow">INVENTORY ENTRY</p><h2 id="formTitle">Add medicine</h2></div><button type="button" class="close-btn" data-close="medicineDialog" aria-label="Close">×</button></div>
+      <input type="hidden" id="medicineId">
+      <label class="field"><span>Medicine name <em>*</em></span><input id="nameInput" type="text" maxlength="120" required placeholder="e.g. Paracetamol 500 mg"></label>
+      <label class="field"><span>Ingredients <em>*</em></span><textarea id="ingredientsInput" required rows="3" placeholder="Enter one ingredient per line. Bullets are added automatically."></textarea><small>Enter each active ingredient on a new line.</small></label>
+      <div class="field-pair">
+        <label class="field"><span>Quantity <em>*</em></span><input id="qtyInput" type="number" required min="0" step="any" placeholder="e.g. 20"></label>
+        <label class="field"><span>Opened date</span><input id="openedInput" type="date"></label>
+      </div>
+      <label class="field"><span>Expiry date <em>*</em></span><input id="expiryInput" type="date" required></label>
+      <label class="field"><span>Medicine image (optional)</span><input id="imageInput" type="file" accept="image/*"><small>Image is resized before saving to reduce storage use.</small><span id="imagePreviewWrap" class="image-preview-wrap hidden"><img id="imagePreview" alt="Medicine preview"><button type="button" id="removeImageBtn" class="text-btn">Remove image</button></span></label>
+      <label class="field"><span>Notes</span><textarea id="notesInput" rows="2" maxlength="1500" placeholder="Storage instructions, location, or other notes"></textarea></label>
+      <div class="field"><span>Expiry reminders <em>*</em></span><p class="field-help">Enter one reminder offset per row: a negative number means days before expiry; 0 means on expiry day; a positive number means days after expiry.</p>
+        <div id="reminderOffsets" class="offset-list"></div>
+        <div class="add-offset-row"><input id="newOffsetInput" type="number" step="1" placeholder="e.g. -7 or 2" aria-label="Reminder offset in days"><button id="addOffsetBtn" type="button" class="btn btn-small btn-outline">＋ Add reminder</button></div>
+        <small>Default reminders: 2 days before, 1 day before, on expiry day, and 1 day after. Remove or change these as needed.</small>
+      </div>
+      <div class="form-error hidden" id="formError" role="alert"></div>
+      <div class="modal-actions"><button type="button" class="btn btn-outline" data-close="medicineDialog">Cancel</button><button type="submit" class="btn btn-primary" id="saveMedicineBtn">Save medicine</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="modal modal-narrow">
+    <div class="modal-head"><div><p class="eyebrow">APP SETTINGS</p><h2>Settings</h2></div><button type="button" class="close-btn" data-close="settingsDialog" aria-label="Close">×</button></div>
+    <div class="settings-section"><h3>Google Drive sync</h3><p>Use the same Google account on every family device. This app creates a single inventory JSON file in the signed-in Google Drive.</p><label class="field"><span>Google OAuth Web Client ID</span><input id="clientIdInput" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off"><small>Required to connect Drive. Create this in Google Cloud Console; see the included setup guide.</small></label><button id="saveClientIdBtn" class="btn btn-primary btn-full">Save Client ID</button><div class="button-row"><button id="connectFromSettingsBtn" class="btn btn-outline">Connect / reconnect</button><button id="syncNowBtn" class="btn btn-outline">Sync now</button></div><p class="small-status" id="syncFeedback"></p></div>
+    <div class="settings-section"><h3>Notifications</h3><p>Notifications can be checked when this app is open. Allow notifications in Android/Chrome settings. A browser may pause checks while the app is closed.</p><button id="enableNotificationsBtn" class="btn btn-outline btn-full">Enable notifications</button><p class="small-status" id="notificationFeedback"></p></div>
+    <div class="settings-section"><h3>Data</h3><p>Inventory is saved on this device and can be exported as a JSON backup. Drive sync is recommended before switching devices or clearing browser data.</p><button id="clearLocalBtn" class="btn btn-danger-outline btn-full">Clear local inventory</button></div>
+  </dialog>
+
+  <dialog id="remindersDialog" class="modal modal-narrow">
+    <div class="modal-head"><div><p class="eyebrow">ALERTS</p><h2>Reminder settings</h2></div><button type="button" class="close-btn" data-close="remindersDialog" aria-label="Close">×</button></div>
+    <p>Each medicine has its own list of reminder offsets. For example, <strong>-2, -1, 0, 1</strong> triggers two days before, one day before, on the expiry date and one day after.</p><p>Notifications are generated on this device. Each family member can enable notifications on their own phone after opening the shared inventory.</p><button id="reminderSettingsEnable" class="btn btn-primary btn-full">Enable notifications on this phone</button><p id="reminderSettingsText" class="small-status"></p>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js"></script>
+</body>
+</html>
